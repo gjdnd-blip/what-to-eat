@@ -110,27 +110,29 @@ const menus = [
 
 // ───────── 2. 비슷한 말 사전 ─────────
 // 사용자가 쓴 단어(왼쪽) → 메뉴 태그(오른쪽)
+// 한 글자짜리 단어(면, 밥, 술...)는 "면접", "회사" 같은 엉뚱한 단어에 걸리지 않도록
+// 뒤에 조사나 띄어쓰기가 올 때만 인식해요. (아래 findWord 함수 참고)
 const synonyms = [
-  [["매운", "매콤", "칼칼", "얼큰", "화끈", "맵"], ["매운"]],
+  [["매운", "매콤", "칼칼", "얼큰", "화끈", "매워", "맵게", "맵다", "맵고"], ["매운"]],
   [["국물", "탕", "찌개", "국밥"], ["국물"]],
   [["따뜻", "따듯", "뜨끈", "뜨거", "후끈"], ["따뜻"]],
-  [["비 오", "비오", "비가", "비는", "빗", "장마", "눈 오", "눈오", "추워", "춥", "쌀쌀", "겨울"], ["국물", "따뜻"]],
-  [["더워", "덥", "여름", "시원", "차가", "냉", "무더"], ["시원"]],
-  [["가벼", "가볍", "부담 없", "부담없", "다이어트", "살 ", "살이", "칼로리"], ["가벼운", "건강"]],
+  [["비 오", "비오", "비가", "비는", "빗", "장마", "눈 오", "눈오", "추워", "추운", "춥다", "쌀쌀", "겨울"], ["국물", "따뜻"]],
+  [["더워", "더운", "덥다", "여름", "시원", "차가", "무더"], ["시원"]],
+  [["가벼", "가볍", "부담 없", "부담없", "다이어트", "살 빼", "살빼", "살이", "살찔", "칼로리"], ["가벼운", "건강"]],
   [["건강", "몸에 좋", "웰빙"], ["건강"]],
   [["든든", "배고", "푸짐", "많이", "허기", "배불"], ["든든"]],
   [["고기", "육류", "단백질"], ["고기"]],
   [["면", "국수", "누들"], ["면"]],
   [["밥", "덮밥"], ["밥"]],
   [["튀김", "바삭", "치킨", "튀긴"], ["튀김", "바삭"]],
-  [["해산물", "생선", "회", "조개", "새우", "오징어", "바다"], ["해산물"]],
-  [["채소", "야채", "풀"], ["채소"]],
+  [["해산물", "생선", "회", "횟집", "조개", "새우", "오징어", "바다"], ["해산물"]],
+  [["채소", "야채"], ["채소"]],
   [["한식", "한국"], ["한식"]],
   [["중식", "중국"], ["중식"]],
   [["일식", "일본"], ["일식"]],
   [["양식", "서양"], ["양식"]],
   [["분식"], ["분식"]],
-  [["야식", "밤", "새벽", "출출"], ["야식"]],
+  [["야식", "밤에", "밤늦", "새벽", "출출"], ["야식"]],
   [["혼자", "혼밥", "나 혼자"], ["혼자"]],
   [["친구", "가족", "같이", "함께", "여럿", "회식", "모임", "커플", "우리"], ["같이"]],
   [["데이트", "분위기", "기념일", "소개팅"], ["데이트"]],
@@ -140,33 +142,78 @@ const synonyms = [
   [["간단", "빨리", "빠르", "급해", "바빠", "시간 없"], ["간단", "빠른"]],
   [["느끼", "기름", "크림", "치즈", "고소"], ["느끼"]],
   [["담백", "깔끔", "순한", "순하", "속 편", "속편", "자극 없"], ["담백"]],
-  [["새콤", "상큼", "시큼", "새콤달콤"], ["새콤"]],
+  [["새콤", "상큼", "시큼"], ["새콤"]],
   [["이국", "색다", "특이", "새로운", "신기", "외국"], ["이국적"]],
   [["스트레스", "우울", "화나", "짜증", "기분 전환", "기분전환", "힘들"], ["매운", "달콤", "스트레스"]],
   [["간식", "심심"], ["간식"]],
+  // 시간대
+  [["아침", "브런치"], ["가벼운", "간단"]],
+  [["점심"], ["빠른"]],
+  [["저녁"], ["든든"]],
 ];
 
-// ───────── 3. 점수 계산과 랜덤 뽑기 ─────────
-let lastPick = null; // 직전에 추천한 메뉴 (연속으로 같은 메뉴가 나오지 않게)
+// "말고", "빼고", "싫어" 같은 부정 표현 (키워드 바로 뒤에 오면 "그건 싫다"는 뜻)
+const NEGATIVE = /^.{0,8}?(말고|빼고|빼줘|싫어|질려|질렸|별로|제외|안 땡|안땡|안 먹|못 먹|말구)/;
 
-// 입력한 글을 분석해서 { 태그: 몇 번 }으로 만들기
-function analyze(text) {
-  const wanted = {};
-  for (const [words, tags] of synonyms) {
-    if (words.some((w) => text.includes(w))) {
-      for (const t of tags) wanted[t] = (wanted[t] || 0) + 1;
-    }
+// ───────── 3. 단어 찾기 ─────────
+const HANGUL = "가-힣";
+
+// 글 안에서 단어를 찾아 { start, end } 위치를 돌려줘요. 없으면 null.
+function findWord(text, word) {
+  if (word.length >= 2) {
+    const i = text.indexOf(word);
+    return i === -1 ? null : { start: i, end: i + word.length };
   }
-  return wanted;
+  // 한 글자 단어: 앞이 한글이 아니고, 뒤가 조사/띄어쓰기/끝일 때만 인정
+  const re = new RegExp(`(^|[^${HANGUL}])${word}(?=$|[^${HANGUL}]|[이가을를은는도랑과로에만])`);
+  const m = re.exec(text);
+  if (!m) return null;
+  const start = m.index + m[1].length;
+  return { start, end: start + word.length };
 }
 
-// 메뉴 점수: 태그가 맞으면 +1, 메뉴 이름을 직접 말하면 +5
-function score(menu, text, wanted) {
+// 입력한 글을 분석해서 좋아하는 태그(wanted)와 피하고 싶은 태그(avoid)를 만들어요.
+function analyze(text) {
+  const wanted = {};
+  const avoid = new Set();
+  for (const [words, tags] of synonyms) {
+    let found = null;
+    for (const w of words) {
+      found = findWord(text, w);
+      if (found) break;
+    }
+    if (!found) continue;
+    const after = text.slice(found.end);
+    if (NEGATIVE.test(after)) {
+      tags.forEach((t) => avoid.add(t));
+    } else {
+      tags.forEach((t) => (wanted[t] = (wanted[t] || 0) + 1));
+    }
+  }
+  return { wanted, avoid };
+}
+
+// 메뉴 이름에서 이모지를 빼고 이름만 꺼내기
+function splitName(name) {
+  const m = name.match(/^(\S+)\s(.+)$/);
+  return { emoji: m[1], title: m[2] };
+}
+
+// 메뉴 점수: 태그가 맞으면 +1, 메뉴 이름을 직접 말하면 +5 (그 메뉴가 싫다고 하면 제외)
+function score(menu, text, wanted, avoid) {
+  const { title } = splitName(menu.name);
+  const hit = findWord(text, title);
+  if (hit && NEGATIVE.test(text.slice(hit.end))) return -1; // "삼겹살 말고"
+  if (menu.tags.some((t) => avoid.has(t) && !wanted[t])) return -1; // "매운 거 말고"
   let s = 0;
   for (const t of menu.tags) s += wanted[t] || 0;
-  const plainName = menu.name.replace(/^\S+\s/, ""); // 이모지 빼고 이름만
-  if (text.includes(plainName)) s += 5;
+  if (hit) s += 5;
   return s;
+}
+
+// ───────── 4. 랜덤 뽑기 ─────────
+function pickRandom(list) {
+  return list[Math.floor(Math.random() * list.length)];
 }
 
 // 가중치 랜덤: 가중치가 클수록 뽑힐 확률이 높음
@@ -180,56 +227,157 @@ function weightedPick(items, weightOf) {
   return items[items.length - 1];
 }
 
-function pickRandom(list) {
-  return list[Math.floor(Math.random() * list.length)];
-}
+// 한 번 추천하기. skip에 들어 있는 메뉴(방금 본 것, 싫어요 누른 것)는 빼고 뽑아요.
+function recommend(text, skip) {
+  const { wanted, avoid } = analyze(text);
+  const scored = menus
+    .map((menu) => ({ menu, s: score(menu, text, wanted, avoid) }))
+    .filter((x) => x.s >= 0 && !skip.has(x.menu));
 
-function recommend(text) {
-  const wanted = analyze(text);
-  const scored = menus.map((menu) => ({ menu, s: score(menu, text, wanted) }));
-
-  // 직전 메뉴는 제외 (후보가 충분할 때만)
-  const notLast = scored.filter((x) => x.menu !== lastPick);
-  const candidates = notLast.length > 0 ? notLast : scored;
-  const matched = candidates.filter((x) => x.s > 0);
-
+  const matched = scored.filter((x) => x.s > 0);
   let pick, intro;
-  if (matched.length === 0) {
-    // 키워드를 하나도 못 찾았을 때: 전체에서 완전 랜덤
-    pick = pickRandom(candidates).menu;
-    intro = "🎲 힌트가 없어서 랜덤으로 뽑아 봤어요!";
-  } else if (Math.random() < 0.15) {
-    // 15% 확률로 깜짝 추천 (조건과 상관없이 전체에서 랜덤)
-    pick = pickRandom(candidates).menu;
-    intro = "🎁 깜짝 추천! 가끔은 색다르게 먹어 볼까요?";
-  } else {
-    // 점수가 높을수록 뽑힐 확률이 큼 (점수의 제곱)
+
+  if (matched.length > 0) {
+    // 점수가 높을수록 뽑힐 확률이 큼 (점수의 제곱). 메인은 항상 입력과 맞는 메뉴!
     pick = weightedPick(matched, (x) => x.s * x.s).menu;
     intro = "👍 말씀하신 내용에 맞춰 골라 봤어요!";
+  } else if (scored.length > 0) {
+    pick = pickRandom(scored).menu;
+    intro = "🎲 힌트가 없어서 랜덤으로 뽑아 봤어요!";
+  } else {
+    // 후보가 다 떨어졌으면 싫어요 목록을 비우고 처음부터
+    skip.clear();
+    const all = menus.filter((mn) => score(mn, text, wanted, avoid) >= 0);
+    pick = pickRandom(all.length ? all : menus);
+    intro = "🔁 다 보셨네요! 처음부터 다시 골라 봤어요.";
   }
 
-  // 이런 메뉴도 있어요: 조건에 맞는 다른 메뉴 중 최대 2개
-  const others = matched.filter((x) => x.menu !== pick).map((x) => x.menu);
+  // 이런 메뉴도 있어요: 조건에 맞는 다른 메뉴 중 최대 3개
+  const others = matched.map((x) => x.menu).filter((mn) => mn !== pick);
   const extras = [];
-  while (extras.length < 2 && others.length > 0) {
+  while (extras.length < 3 && others.length > 0) {
     extras.push(others.splice(Math.floor(Math.random() * others.length), 1)[0]);
   }
 
-  lastPick = pick;
-  let out = `${intro}\n\n${pick.name}\n${pick.desc}`;
-  if (extras.length > 0) {
-    out += `\n\n이런 메뉴도 있어요: ${extras.map((e) => e.name).join(", ")}`;
+  // 깜짝 추천: 30% 확률로 별도 카드에 조건과 상관없는 메뉴를 보여줘요.
+  let surprise = null;
+  if (Math.random() < 0.3) {
+    const pool = scored.map((x) => x.menu).filter((mn) => mn !== pick && !extras.includes(mn));
+    if (pool.length > 0) surprise = pickRandom(pool);
   }
-  return out;
+
+  return { pick, intro, extras, surprise };
 }
 
-btn.addEventListener("click", () => {
+// ───────── 5. 화면 그리기 ─────────
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function mapLink(menu) {
+  const a = el("a", "btn-sub", "📍 근처 맛집 찾기");
+  a.href = "https://map.naver.com/p/search/" + encodeURIComponent(splitName(menu.name).title);
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  return a;
+}
+
+function render(data) {
+  const { pick, intro, extras, surprise } = data;
+  const { emoji, title } = splitName(pick.name);
+  result.replaceChildren();
+
+  const box = el("div", "pick");
+  box.append(
+    el("p", "intro", intro),
+    el("div", "emoji", emoji),
+    el("h2", "menu-title", title),
+    el("p", "menu-desc", pick.desc)
+  );
+
+  const actions = el("div", "actions");
+  const nope = el("button", "btn-sub", "👎 다른 메뉴");
+  nope.type = "button";
+  nope.addEventListener("click", () => {
+    skip.add(pick);
+    showRecommendation();
+  });
+  actions.append(mapLink(pick), nope);
+  box.append(actions);
+  result.append(box);
+
+  if (extras.length > 0) {
+    const row = el("div", "extras");
+    row.append(el("p", "extras-label", "이런 메뉴도 있어요 (눌러 보세요)"));
+    const chips = el("div", "chips");
+    for (const mn of extras) {
+      const chip = el("button", "chip", mn.name);
+      chip.type = "button";
+      chip.addEventListener("click", () => {
+        skip.add(pick);
+        render({ pick: mn, intro: "👆 직접 고르셨어요!", extras: [], surprise: null });
+      });
+      chips.append(chip);
+    }
+    row.append(chips);
+    result.append(row);
+  }
+
+  if (surprise) {
+    const card = el("div", "surprise");
+    card.append(
+      el("p", "surprise-label", "🎁 깜짝 추천! 가끔은 색다르게 먹어 볼까요?"),
+      el("p", "surprise-name", surprise.name),
+      el("p", "menu-desc", surprise.desc)
+    );
+    result.append(card);
+  }
+
+  result.classList.remove("hidden");
+  // 애니메이션을 다시 재생
+  result.classList.remove("show");
+  void result.offsetWidth;
+  result.classList.add("show");
+}
+
+// ───────── 6. 버튼과 키보드 ─────────
+const skip = new Set(); // 방금 본 메뉴, 싫어요 누른 메뉴
+let lastText = "";
+
+function showRecommendation() {
   const text = input.value.trim();
   if (!text) {
     alert("먹고 싶은 걸 먼저 적어 주세요!");
+    input.focus();
     return;
   }
-  result.classList.remove("hidden");
-  result.textContent = recommend(text);
-  btn.textContent = "🔄 다시 추천받기";
+  if (text !== lastText) {
+    skip.clear(); // 새 문장이면 목록 초기화
+    lastText = text;
+  }
+  const data = recommend(text, skip);
+  skip.add(data.pick); // 같은 메뉴가 연속으로 나오지 않게
+  render(data);
+  btn.textContent = "다시 추천받기";
+}
+
+btn.addEventListener("click", showRecommendation);
+
+// Enter로 추천받기 (Shift+Enter는 줄바꿈, 한글 조합 중에는 무시)
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    showRecommendation();
+  }
+});
+
+// 예시 칩: 누르면 문장이 입력되고 바로 추천
+document.querySelectorAll(".example").forEach((b) => {
+  b.addEventListener("click", () => {
+    input.value = b.dataset.text;
+    showRecommendation();
+  });
 });

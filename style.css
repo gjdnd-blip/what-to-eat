@@ -7,7 +7,8 @@ body {
   justify-content: center;
   align-items: center;
   background: #fff4e6;
-  font-family: "Malgun Gothic", sans-serif;
+  color: #222;
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
 }
 
 .card {
@@ -21,7 +22,16 @@ body {
 }
 
 h1 { margin: 0 0 8px; text-align: center; }
-.sub { margin: 0 0 20px; text-align: center; color: #777; }
+.sub { margin: 0 0 20px; text-align: center; color: #555; }
+
+/* 화면에는 안 보이지만 스크린 리더는 읽는 글자 */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 
 textarea {
   width: 100%;
@@ -34,26 +44,117 @@ textarea {
 }
 textarea:focus { outline: none; border-color: #ff922b; }
 
-button {
+/* 예시 칩 */
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.example {
+  padding: 6px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #7a3e00;
+  background: #fff4e6;
+  border: 1px solid #ffd8a8;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.example:hover { background: #ffe8cc; }
+
+#btn {
   width: 100%;
-  margin-top: 12px;
+  margin-top: 14px;
   padding: 14px;
   font-size: 18px;
+  font-family: inherit;
   color: #fff;
-  background: #ff922b;
+  background: #e8590c;
   border: none;
   border-radius: 8px;
   cursor: pointer;
 }
-button:hover { background: #f76707; }
-button:disabled { background: #ccc; cursor: wait; }
+#btn:hover { background: #d9480f; }
 
-.result {
-  margin-top: 20px;
-  padding: 16px;
-  background: #fff9db;
-  border-radius: 8px;
-  line-height: 1.6;
-  white-space: pre-wrap;
+button:focus-visible, a:focus-visible, textarea:focus-visible {
+  outline: 3px solid #1c7ed6;
+  outline-offset: 2px;
 }
+
+/* ───── 결과 영역 ───── */
+.result { margin-top: 20px; }
 .hidden { display: none; }
+.result.show { animation: fadeUp 0.35s ease; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pick {
+  padding: 20px 16px;
+  text-align: center;
+  background: #fff9db;
+  border-radius: 12px;
+}
+.intro { margin: 0 0 8px; font-size: 14px; color: #5c4a00; }
+.emoji {
+  font-size: 64px;
+  line-height: 1.2;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+.menu-title { margin: 4px 0; font-size: 28px; }
+.menu-desc { margin: 0; color: #444; line-height: 1.5; }
+
+.actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.btn-sub {
+  display: inline-block;
+  padding: 9px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #333;
+  text-decoration: none;
+  background: #fff;
+  border: 1px solid #e0c36a;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.btn-sub:hover { background: #fff3bf; }
+
+.extras { margin-top: 16px; }
+.extras-label { margin: 0 0 8px; font-size: 14px; color: #555; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  padding: 8px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  color: #222;
+  background: #f1f3f5;
+  border: 1px solid #dee2e6;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chip:hover { background: #e9ecef; }
+
+.surprise {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: #f3f0ff;
+  border: 1px dashed #b197fc;
+  border-radius: 12px;
+  text-align: center;
+}
+.surprise-label { margin: 0 0 6px; font-size: 14px; color: #4c2a9a; }
+.surprise-name { margin: 0 0 2px; font-size: 20px; font-weight: bold; }
+
+/* 좁은 화면 */
+@media (max-width: 400px) {
+  .card { padding: 24px 16px; }
+  .menu-title { font-size: 24px; }
+}
