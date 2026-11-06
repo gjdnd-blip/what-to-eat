@@ -130,10 +130,20 @@ const PRICE = {
 };
 menus.forEach((mn) => { mn.price = PRICE[splitName(mn.name).title]; });
 
+// 보통 여럿이 나눠 먹는 메뉴 (가격은 1인당으로 나눈 대략적인 값이에요)
+const SHARED = new Set([
+  "삼겹살", "보쌈", "족발", "곱창", "닭한마리", "탕수육", "깐풍기", "마라샹궈", "훠궈",
+  "후라이드치킨", "양념치킨", "해물탕", "조개구이", "매운탕", "감자탕", "부대찌개",
+  "닭갈비", "찜닭", "닭발", "피자", "회",
+]);
+
 const PRICE_TEXT = { 1: "💸 1만원 이하", 2: "💵 1~2만원", 3: "💎 2만원 이상" };
 let currentPrice = 0; // 0 = 상관없음
 const priceOk = (mn) => currentPrice === 0 || mn.price === currentPrice;
-const priceLabel = (mn) => `${PRICE_TEXT[mn.price]} (1인 기준)`;
+const priceLabel = (mn) =>
+  SHARED.has(splitName(mn.name).title)
+    ? `${PRICE_TEXT[mn.price]} · 1인당, 보통 함께 먹어요`
+    : `${PRICE_TEXT[mn.price]} (1인 기준)`;
 
 // ───────── 2. 비슷한 말 사전 ─────────
 // 사용자가 쓴 단어(왼쪽) → 메뉴 태그(오른쪽)
@@ -173,6 +183,21 @@ const synonyms = [
   [["이국", "색다", "특이", "새로운", "신기", "외국"], ["이국적"]],
   [["스트레스", "우울", "화나", "짜증", "기분 전환", "기분전환", "힘들"], ["매운", "달콤", "스트레스"]],
   [["간식", "심심"], ["간식"]],
+  // 컨디션·기분
+  [["입맛이 없", "입맛 없", "입맛없", "식욕 없", "식욕없", "물려", "물리"], ["새콤", "담백"]],
+  [["피곤", "기운", "보양", "몸보신", "체력", "지쳐", "피로", "번아웃"], ["든든", "국물", "따뜻", "건강"]],
+  [["감기", "몸살", "아파", "아프", "열 나", "열나"], ["따뜻", "국물", "담백"]],
+  // 영어로 써도 알아들어요 (소문자로 바꿔서 비교해요)
+  [["spicy"], ["매운"]],
+  [["noodle", "noodles", "ramen"], ["면"]],
+  [["soup"], ["국물"]],
+  [["rice"], ["밥"]],
+  [["light", "healthy"], ["가벼운", "건강"]],
+  [["meat", "beef", "pork", "steak"], ["고기"]],
+  [["chicken", "fried", "crispy"], ["튀김", "바삭"]],
+  [["seafood", "fish"], ["해산물"]],
+  [["sweet"], ["달콤"]],
+  [["sour"], ["새콤"]],
   // 시간대
   [["아침", "브런치"], ["가벼운", "간단"]],
   [["점심"], ["빠른"]],
@@ -180,42 +205,70 @@ const synonyms = [
 ];
 
 // "말고", "빼고", "싫어" 같은 부정 표현 (키워드 바로 뒤에 오면 "그건 싫다"는 뜻)
-const NEGATIVE = /^.{0,8}?(말고|빼고|빼줘|싫어|질려|질렸|별로|제외|안 땡|안땡|안 먹|못 먹|말구)/;
+// 단, "안 먹어본 지 오래됐다", "안 먹었더니"처럼 지난 경험을 말하는 건 부정이 아니에요.
+const NEGATIVE = /^.{0,8}?(말고|말구|빼고|빼줘|싫어|질려|질렸|별로|제외|안 ?땡|안 ?먹(?!어본|어 본|은|었)|못 ?먹(?!어본|어 본|은|었))/;
+
+// 메뉴 이름을 다르게 써도 찾을 수 있게 별칭을 적어 둬요 (예: 돈가스 → 돈카츠)
+const ALIASES = {
+  "짜장면": ["짜장", "자장"], "돈카츠": ["돈가스", "돈까스", "카츠"], "탕수육": ["탕슉"],
+  "후라이드치킨": ["후라이드", "프라이드"], "양념치킨": ["양념"], "김치찌개": ["김찌"],
+  "떡볶이": ["떡복이", "떡뽂이"], "삼겹살": ["삼겹"], "마라탕": ["마라"], "마라샹궈": ["마라"],
+  "햄버거": ["버거", "burger"], "초밥": ["스시", "sushi"], "파스타": ["pasta", "스파게티"],
+  "피자": ["pizza"], "스테이크": ["steak"], "샐러드": ["salad"], "회": ["사시미", "생선회"],
+  "부대찌개": ["부대"], "순두부찌개": ["순두부"], "된장찌개": ["된장"], "냉면": ["물냉", "비냉"],
+  "카레": ["curry"], "비빔밥": ["bibimbap"], "닭갈비": ["닭갈"], "칼국수": ["칼국"],
+  "라멘": ["ramen"], "인도 커리와 난": ["인도", "커리"], "김밥": ["gimbap"], "쌀국수": ["pho"],
+};
 
 // ───────── 3. 단어 찾기 ─────────
 const HANGUL = "가-힣";
 
-// 글 안에서 단어를 찾아 { start, end } 위치를 돌려줘요. 없으면 null.
-function findWord(text, word) {
-  if (word.length >= 2) {
-    const i = text.indexOf(word);
-    return i === -1 ? null : { start: i, end: i + word.length };
+// 글 안에서 단어가 나온 곳을 전부 찾아 [{ start, end }, ...]로 돌려줘요.
+function findAll(text, word) {
+  const out = [];
+  let re;
+  if (/^[a-z]+$/.test(word)) {
+    re = new RegExp(`(^|[^a-z])${word}(?![a-z])`, "g"); // 영어: 다른 영어 단어의 일부면 제외
+  } else if (word.length >= 2) {
+    let i = text.indexOf(word);
+    while (i !== -1) {
+      out.push({ start: i, end: i + word.length });
+      i = text.indexOf(word, i + word.length);
+    }
+    return out;
+  } else {
+    // 한 글자 단어: 앞이 한글이 아니고, 뒤가 조사/띄어쓰기/끝일 때만 인정
+    re = new RegExp(`(^|[^${HANGUL}])${word}(?=$|[^${HANGUL}]|[이가을를은는도랑과로에만])`, "g");
   }
-  // 한 글자 단어: 앞이 한글이 아니고, 뒤가 조사/띄어쓰기/끝일 때만 인정
-  const re = new RegExp(`(^|[^${HANGUL}])${word}(?=$|[^${HANGUL}]|[이가을를은는도랑과로에만])`);
-  const m = re.exec(text);
-  if (!m) return null;
-  const start = m.index + m[1].length;
-  return { start, end: start + word.length };
+  let m;
+  while ((m = re.exec(text))) {
+    const start = m.index + m[1].length;
+    out.push({ start, end: start + word.length });
+    re.lastIndex = start + word.length;
+  }
+  return out;
 }
 
+// 처음 나온 곳만 필요할 때
+const findWord = (text, word) => findAll(text, word)[0] || null;
+
 // 입력한 글을 분석해서 좋아하는 태그(wanted)와 피하고 싶은 태그(avoid)를 만들어요.
+// 같은 단어가 여러 번 나오면 전부 살펴봐요. 한 번이라도 "원한다"고 쓰였으면 원하는 걸로 쳐요.
 function analyze(text) {
+  text = text.toLowerCase();
   const wanted = {};
   const avoid = new Set();
   for (const [words, tags] of synonyms) {
-    let found = null;
+    let pos = 0;
+    let neg = 0;
     for (const w of words) {
-      found = findWord(text, w);
-      if (found) break;
+      for (const hit of findAll(text, w)) {
+        if (NEGATIVE.test(text.slice(hit.end))) neg++;
+        else pos++;
+      }
     }
-    if (!found) continue;
-    const after = text.slice(found.end);
-    if (NEGATIVE.test(after)) {
-      tags.forEach((t) => avoid.add(t));
-    } else {
-      tags.forEach((t) => (wanted[t] = (wanted[t] || 0) + 1));
-    }
+    if (pos > 0) tags.forEach((t) => (wanted[t] = (wanted[t] || 0) + 1));
+    else if (neg > 0) tags.forEach((t) => avoid.add(t));
   }
   return { wanted, avoid };
 }
@@ -227,9 +280,19 @@ function splitName(name) {
 }
 
 // 메뉴 점수: 태그가 맞으면 +1, 메뉴 이름을 직접 말하면 +5 (그 메뉴가 싫다고 하면 제외)
-function score(menu, text, wanted, avoid) {
+// 입력에서 이 메뉴의 이름(또는 별칭)이 나온 곳. 없으면 null
+function nameHit(menu, text) {
   const { title } = splitName(menu.name);
-  const hit = findWord(text, title);
+  for (const w of [title, ...(ALIASES[title] || [])]) {
+    const hit = findWord(text, w);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function score(menu, text, wanted, avoid) {
+  text = text.toLowerCase();
+  const hit = nameHit(menu, text);
   if (hit && NEGATIVE.test(text.slice(hit.end))) return -1; // "삼겹살 말고"
   if (menu.tags.some((t) => avoid.has(t) && !wanted[t])) return -1; // "매운 거 말고"
   let s = 0;
@@ -256,26 +319,49 @@ function weightedPick(items, weightOf) {
 
 // 한 번 추천하기. skip에 들어 있는 메뉴(방금 본 것, 싫어요 누른 것)는 빼고 뽑아요.
 function recommend(text, skip) {
+  text = text.toLowerCase();
   const { wanted, avoid } = analyze(text);
-  const scored = menus
-    .map((menu) => ({ menu, s: score(menu, text, wanted, avoid) }))
-    .filter((x) => x.s >= 0 && !skip.has(x.menu) && priceOk(x.menu));
+  const hasWanted = Object.keys(wanted).length > 0;
 
-  const matched = scored.filter((x) => x.s > 0);
+  // all: 싫다고 한 것만 뺀 전체 / inPrice: 거기서 고른 가격대만
+  const all = menus
+    .map((menu) => ({ menu, s: score(menu, text, wanted, avoid) }))
+    .filter((x) => x.s >= 0);
+  const inPrice = all.filter((x) => priceOk(x.menu));
+  const fitAll = all.filter((x) => x.s > 0);       // 가격 상관없이 맞는 메뉴
+  const fitPrice = inPrice.filter((x) => x.s > 0); // 고른 가격대에서 맞는 메뉴
+
+  // 가격대 때문에 후보가 확 줄었다면 알려 주기
+  let note = "";
+  if (currentPrice !== 0 && fitAll.length > fitPrice.length && fitPrice.length <= 3) {
+    note = fitPrice.length === 0
+      ? `💡 이 가격대엔 딱 맞는 메뉴가 없어요. '상관없음'으로 바꾸면 ${fitAll.length}개 중에서 골라요.`
+      : `💡 이 가격대엔 맞는 메뉴가 ${fitPrice.length}개뿐이에요. '상관없음'으로 바꾸면 ${fitAll.length}개 중에서 골라요.`;
+  }
+
+  const scored = inPrice.filter((x) => !skip.has(x.menu)); // 아직 안 본 메뉴
+  let matched = scored.filter((x) => x.s > 0);
   let pick, intro;
 
   if (matched.length > 0) {
     // 점수가 높을수록 뽑힐 확률이 큼 (점수의 제곱). 메인은 항상 입력과 맞는 메뉴!
     pick = weightedPick(matched, (x) => x.s * x.s).menu;
     intro = "👍 말씀하신 내용에 맞춰 골라 봤어요!";
+  } else if (fitPrice.length > 0) {
+    // 맞는 메뉴를 전부 본 경우: 본 목록에서 빼고 처음부터 다시 (방금 본 건 제외)
+    fitPrice.forEach((x) => skip.delete(x.menu));
+    matched = fitPrice.length > 1 ? fitPrice.filter((x) => x.menu !== lastPick) : fitPrice;
+    pick = weightedPick(matched, (x) => x.s * x.s).menu;
+    intro = "🔁 맞는 메뉴를 다 보셨어요! 처음부터 다시 골라 봤어요.";
   } else if (scored.length > 0) {
     pick = pickRandom(scored).menu;
-    intro = "🎲 힌트가 없어서 랜덤으로 뽑아 봤어요!";
+    if (hasWanted) intro = "🎲 딱 맞는 메뉴가 없어서 아무거나 골라 봤어요!";
+    else if (avoid.size > 0) intro = "🙅 말씀하신 건 빼고 랜덤으로 골라 봤어요!";
+    else intro = "🎲 힌트가 없어서 랜덤으로 뽑아 봤어요!";
   } else {
-    // 후보가 다 떨어졌으면 싫어요 목록을 비우고 처음부터
+    // 후보가 다 떨어졌으면 본 목록을 비우고 처음부터
     skip.clear();
-    const all = menus.filter((mn) => priceOk(mn) && score(mn, text, wanted, avoid) >= 0);
-    pick = pickRandom(all.length ? all : menus.filter(priceOk));
+    pick = pickRandom(inPrice.length ? inPrice.map((x) => x.menu) : menus.filter(priceOk));
     intro = "🔁 다 보셨네요! 처음부터 다시 골라 봤어요.";
   }
 
@@ -286,14 +372,15 @@ function recommend(text, skip) {
     extras.push(others.splice(Math.floor(Math.random() * others.length), 1)[0]);
   }
 
-  // 깜짝 추천: 30% 확률로 별도 카드에 조건과 상관없는 메뉴를 보여줘요.
+  // 깜짝 추천: 30% 확률로 별도 카드에 조건과 상관없는 메뉴를 보여줘요. (아직 안 본 메뉴 우선)
   let surprise = null;
   if (Math.random() < 0.3) {
-    const pool = scored.map((x) => x.menu).filter((mn) => mn !== pick && !extras.includes(mn));
+    const unseen = scored.length > 0 ? scored : inPrice;
+    const pool = unseen.map((x) => x.menu).filter((mn) => mn !== pick && !extras.includes(mn));
     if (pool.length > 0) surprise = pickRandom(pool);
   }
 
-  return { pick, intro, extras, surprise };
+  return { pick, intro, extras, surprise, note };
 }
 
 // ───────── 5. 화면 그리기 ─────────
@@ -302,6 +389,33 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+// 결과 공유: 폰에서는 공유 창을 열고, 컴퓨터에서는 문장을 복사해요
+async function shareMenu(menu, button) {
+  const { emoji, title } = splitName(menu.name);
+  const text = `오늘은 ${title} 어때요? ${emoji}`;
+  const url = location.protocol.startsWith("http") ? location.href.split("#")[0] : "";
+  const flash = (msg) => {
+    const old = button.textContent;
+    button.textContent = msg;
+    setTimeout(() => { button.textContent = old; }, 1600);
+  };
+  const isPhone = /Android|iPhone|iPad/i.test(navigator.userAgent);
+  if (isPhone && navigator.share) {
+    try {
+      await navigator.share({ title: "오늘 뭐 먹지?", text, url });
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return; // 사용자가 공유 창을 닫음
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url ? `${text}\n${url}` : text);
+    flash("✅ 복사했어요!");
+  } catch (e) {
+    flash("😢 복사하지 못했어요");
+  }
 }
 
 function mapLink(menu) {
@@ -333,9 +447,14 @@ function render(data) {
     skip.add(pick);
     showRecommendation();
   });
-  actions.append(mapLink(pick), nope);
+  const share = el("button", "btn-sub", "🔗 공유하기");
+  share.type = "button";
+  share.addEventListener("click", () => shareMenu(pick, share));
+  actions.append(mapLink(pick), share, nope);
   box.append(actions);
   result.append(box);
+
+  if (data.note) result.append(el("p", "note", data.note));
 
   if (extras.length > 0) {
     const row = el("div", "extras");
@@ -375,14 +494,27 @@ function render(data) {
 // ───────── 6. 버튼과 키보드 ─────────
 const skip = new Set(); // 방금 본 메뉴, 싫어요 누른 메뉴
 let lastText = "";
+let lastPick = null; // 직전에 추천한 메뉴
+const msg = document.getElementById("msg");
+
+// 입력창이 비어 있을 때: alert 팝업 대신 입력창 아래에 안내 + 살짝 흔들기
+function warnEmpty() {
+  msg.textContent = "먹고 싶은 걸 먼저 적어 주세요 🙏";
+  msg.hidden = false;
+  input.classList.remove("shake");
+  void input.offsetWidth; // 애니메이션을 다시 재생하기 위한 트릭
+  input.classList.add("shake");
+  input.focus();
+}
+input.addEventListener("input", () => { msg.hidden = true; });
 
 function showRecommendation() {
   const text = input.value.trim();
   if (!text) {
-    alert("먹고 싶은 걸 먼저 적어 주세요!");
-    input.focus();
+    warnEmpty();
     return;
   }
+  msg.hidden = true;
   if (text !== lastText) {
     skip.clear(); // 새 문장이면 목록 초기화
     lastText = text;
@@ -390,6 +522,7 @@ function showRecommendation() {
   if (spinning) return; // 룰렛이 도는 중에는 또 누를 수 없게
   const data = recommend(text, skip);
   skip.add(data.pick); // 같은 메뉴가 연속으로 나오지 않게
+  lastPick = data.pick;
   spinThen(() => {
     playDone();
     render(data);
@@ -500,7 +633,7 @@ const priceBtns = document.querySelectorAll(".price-opt");
 priceBtns.forEach((b) => {
   b.addEventListener("click", () => {
     currentPrice = Number(b.dataset.price);
-    priceBtns.forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+    priceBtns.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     playPop();
     // 이미 추천을 한 번 받았다면, 바뀐 가격대로 바로 다시 추천
     if (lastText && input.value.trim()) {

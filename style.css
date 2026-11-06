@@ -118,6 +118,20 @@ textarea:focus {
   transform: translate(-2px, -2px);
 }
 
+/* 빈 입력 안내 + 흔들기 */
+.msg {
+  margin: 8px 4px 0;
+  font-size: 16px;
+  color: #c92a2a;
+}
+.msg[hidden] { display: none; }
+textarea.shake { animation: shake-x 0.4s; }
+@keyframes shake-x {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-7px); }
+  40%, 80% { transform: translateX(7px); }
+}
+
 /* ───── 예시 칩 (색이 돌아가며 바뀜) ───── */
 .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .example {
@@ -156,7 +170,7 @@ textarea:focus {
 }
 .price-opt:hover { transform: translateY(-2px); background: var(--cream); }
 /* 선택된 옵션: 진한 배경 + 밝은 글자 */
-.price-opt[aria-checked="true"] {
+.price-opt[aria-pressed="true"] {
   color: var(--cream);
   background: var(--ink);
   box-shadow: 3px 3px 0 var(--tomato);
@@ -291,6 +305,17 @@ button:focus-visible, a:focus-visible {
 .btn-sub:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
 .btn-sub:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
 
+/* 가격대 때문에 후보가 적을 때 안내 */
+.note {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 1.5;
+  background: #fff3bf;
+  border: 2px dashed var(--ink);
+  border-radius: 12px;
+}
+
 /* 이런 메뉴도 있어요 */
 .extras { margin-top: 20px; }
 .extras-label { margin: 0 0 10px; font-size: 15px; color: var(--muted); }
@@ -321,6 +346,17 @@ button:focus-visible, a:focus-visible {
 .surprise-label { margin: 0 0 6px; font-size: 15px; }
 .surprise-name { margin: 0 0 2px; font-size: 24px; }
 .surprise .menu-desc { color: var(--ink); font-size: 16px; }
+
+/* 아주 좁은 화면(작은 폰): 소리 버튼을 줄여서 접시 아이콘을 가리지 않게 */
+@media (max-width: 400px) {
+  .sound-btn { top: 10px; right: 10px; width: 38px; height: 38px; font-size: 18px; }
+  .music-btn { right: 54px; }
+  .music-btn[aria-pressed="false"]::after { left: 7px; right: 7px; }
+}
+
+@media (max-width: 330px) {
+  .hero-emoji { width: 60px; height: 60px; font-size: 34px; }
+}
 
 /* 좁은 화면 */
 @media (max-width: 420px) {
