@@ -187,6 +187,24 @@ textarea:focus {
 .sound-btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
 .sound-btn[aria-pressed="false"] { background: #eadfc8; }
 
+/* 배경음악 버튼: 효과음 버튼 왼쪽에 나란히 */
+.music-btn { right: 68px; }
+.music-btn[aria-pressed="false"] { opacity: 0.85; }
+.music-btn[aria-pressed="false"]::after {   /* 꺼져 있을 땐 사선으로 표시 */
+  content: "";
+  position: absolute;
+  left: 9px; right: 9px; top: 50%;
+  border-top: 3px solid var(--ink);
+  transform: rotate(-45deg);
+}
+.music-btn[aria-pressed="true"] { background: var(--mint); }
+.music-btn[aria-pressed="true"] { animation: bob 1.6s ease-in-out infinite; }
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+.music-btn[aria-pressed="true"]:active { animation: none; }
+
 /* ───── 메인 버튼 (꾹 눌리는 느낌) ───── */
 #btn {
   display: block;

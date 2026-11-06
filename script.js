@@ -509,3 +509,164 @@ priceBtns.forEach((b) => {
     }
   });
 });
+
+// ───────── 9. 잔잔한 배경음악 (파일 없이 직접 연주해요) ─────────
+// 4마디짜리 코드 진행(Cmaj7 → Am7 → Fmaj7 → G6)을 천천히 반복하고,
+// 그 위에 펜타토닉 음계의 음을 드문드문 얹어요. 어떤 음을 골라도 어울려서 끝나지 않는 곡이 돼요.
+const musicBtn = document.getElementById("musicBtn");
+const music = { on: false, bus: null, timer: null, nextBar: 0, bar: 0, lastNote: 0 };
+
+const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12); // 건반 번호 → 소리 높이(Hz)
+const CHORDS = [
+  [48, 52, 55, 59], // Cmaj7
+  [45, 52, 55, 60], // Am7
+  [53, 57, 60, 64], // Fmaj7
+  [55, 59, 62, 64], // G6
+];
+const MELODY = [67, 69, 72, 74, 76, 79, 81]; // 도 레 미 솔 라 (펜타토닉)
+const BAR = 4;   // 한 마디 길이(초)
+const STEP = 0.5; // 멜로디 한 칸 길이(초)
+
+// 효과음 설정과 상관없이 소리를 낼 수 있는 오디오 장치 가져오기
+function ctxAny() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!sound.ctx) sound.ctx = new AC();
+  if (sound.ctx.state === "suspended") sound.ctx.resume();
+  return sound.ctx;
+}
+
+// 음악 전용 믹서: 볼륨 조절 + 은은한 메아리(딜레이)
+function makeBus(c) {
+  const master = c.createGain();
+  master.gain.setValueAtTime(0.0001, c.currentTime);
+  master.gain.exponentialRampToValueAtTime(0.9, c.currentTime + 1.8); // 서서히 커지기
+  const echo = c.createDelay(1);
+  echo.delayTime.value = 0.42;
+  const feedback = c.createGain();
+  feedback.gain.value = 0.32;
+  const tone = c.createBiquadFilter();
+  tone.type = "lowpass";
+  tone.frequency.value = 1800; // 메아리를 부드럽게
+  master.connect(c.destination);
+  master.connect(echo);
+  echo.connect(tone);
+  tone.connect(feedback);
+  feedback.connect(echo);
+  tone.connect(c.destination);
+  return master;
+}
+
+// 부드러운 화음 한 음: 천천히 커졌다가 천천히 사라져요
+function padNote(c, bus, midi, t) {
+  const osc = c.createOscillator();
+  const lp = c.createBiquadFilter();
+  const g = c.createGain();
+  osc.type = "sine";
+  osc.frequency.value = mtof(midi);
+  lp.type = "lowpass";
+  lp.frequency.value = 900;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.03, t + 1.4);
+  g.gain.setValueAtTime(0.03, t + BAR - 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + BAR + 0.9);
+  osc.connect(lp);
+  lp.connect(g);
+  g.connect(bus);
+  osc.start(t);
+  osc.stop(t + BAR + 1);
+}
+
+// 멜로디 한 음: 오르골처럼 톡 울리고 사라져요
+function pluck(c, bus, midi, t, vol) {
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = "triangle";
+  osc.frequency.value = mtof(midi);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+  osc.connect(g);
+  g.connect(bus);
+  osc.start(t);
+  osc.stop(t + 1.7);
+}
+
+// 한 마디 분량의 소리를 미리 예약해 두기
+function scheduleBar(c, t) {
+  const chord = CHORDS[music.bar % CHORDS.length];
+  chord.forEach((m) => padNote(c, music.bus, m, t));
+  for (let i = 0; i < BAR / STEP; i++) {
+    if (Math.random() > 0.42) continue; // 쉬는 칸도 있어야 잔잔해요
+    let note;
+    do { note = pickRandom(MELODY); } while (note === music.lastNote); // 같은 음 연속 방지
+    music.lastNote = note;
+    pluck(c, music.bus, note, t + i * STEP, 0.035 + Math.random() * 0.02);
+  }
+  music.bar++;
+}
+
+function startMusic() {
+  const c = ctxAny();
+  if (!c || music.timer) return;
+  music.bus = makeBus(c);
+  music.nextBar = c.currentTime + 0.1;
+  music.bar = 0;
+  const tick = () => {
+    // 앞으로 2초 안에 시작하는 마디까지 예약
+    while (music.nextBar < c.currentTime + 2) {
+      scheduleBar(c, music.nextBar);
+      music.nextBar += BAR;
+    }
+  };
+  tick();
+  music.timer = setInterval(tick, 1000);
+}
+
+function stopMusic() {
+  if (music.timer) { clearInterval(music.timer); music.timer = null; }
+  const bus = music.bus;
+  music.bus = null;
+  if (bus && sound.ctx) {
+    const t = sound.ctx.currentTime;
+    bus.gain.cancelScheduledValues(t);
+    bus.gain.setValueAtTime(Math.max(bus.gain.value, 0.0001), t);
+    bus.gain.exponentialRampToValueAtTime(0.0001, t + 0.8); // 서서히 작아지기
+    setTimeout(() => bus.disconnect(), 1200);
+  }
+}
+
+function updateMusicBtn() {
+  musicBtn.setAttribute("aria-pressed", String(music.on));
+  musicBtn.title = music.on ? "배경음악 끄기" : "배경음악 켜기";
+}
+
+function setMusic(on) {
+  music.on = on;
+  try { localStorage.setItem("music", on ? "on" : "off"); } catch (e) { /* 무시 */ }
+  if (on) startMusic(); else stopMusic();
+  updateMusicBtn();
+}
+musicBtn.addEventListener("click", () => setMusic(!music.on));
+
+// 저장된 설정이 "켜짐"이면, 브라우저 규칙상 첫 클릭/키 입력 때 시작해요
+let savedMusic = false;
+try { savedMusic = localStorage.getItem("music") === "on"; } catch (e) { /* 무시 */ }
+if (savedMusic) {
+  music.on = true;
+  const resumeOnce = () => {
+    document.removeEventListener("pointerdown", resumeOnce);
+    document.removeEventListener("keydown", resumeOnce);
+    if (music.on && !music.timer) startMusic();
+  };
+  document.addEventListener("pointerdown", resumeOnce);
+  document.addEventListener("keydown", resumeOnce);
+}
+updateMusicBtn();
+
+// 다른 탭을 보고 있을 땐 소리를 멈췄다가, 돌아오면 이어서 재생
+document.addEventListener("visibilitychange", () => {
+  if (!sound.ctx) return;
+  if (document.hidden) sound.ctx.suspend();
+  else sound.ctx.resume();
+});
