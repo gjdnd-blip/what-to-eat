@@ -22,6 +22,7 @@
   </div>
 
   <main class="card">
+    <button type="button" id="soundBtn" class="sound-btn" aria-pressed="true" aria-label="소리 켜기/끄기" title="소리 끄기">🔊</button>
     <header class="hero">
       <div class="hero-emoji" aria-hidden="true">🍽️</div>
       <h1>오늘 <span class="mark">뭐 먹지?</span></h1>
@@ -38,6 +39,16 @@
       <button type="button" class="example" data-text="친구랑 술 한잔 할 건데 바삭한 거">🍻 친구랑 한잔</button>
       <button type="button" class="example" data-text="스트레스 받아서 매운 거 먹고 싶어">😤 스트레스</button>
       <button type="button" class="example" data-text="더운데 시원하고 가벼운 거">🥵 더운 날</button>
+    </div>
+
+    <div class="price" role="radiogroup" aria-label="가격대">
+      <p class="price-label">💰 가격대 <small>(1인 기준 대략적인 가격이에요)</small></p>
+      <div class="price-row">
+        <button type="button" class="price-opt" role="radio" aria-checked="true"  data-price="0">상관없음</button>
+        <button type="button" class="price-opt" role="radio" aria-checked="false" data-price="1">💸 1만원 이하</button>
+        <button type="button" class="price-opt" role="radio" aria-checked="false" data-price="2">💵 1~2만원</button>
+        <button type="button" class="price-opt" role="radio" aria-checked="false" data-price="3">💎 2만원 이상</button>
+      </div>
     </div>
 
     <button type="button" id="btn">추천받기</button>

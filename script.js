@@ -108,6 +108,33 @@ const menus = [
   m("🍦 빙수", "더운 날 달콤하게 식히는 디저트예요.", "달콤 시원 간식 같이"),
 ];
 
+// ───────── 1-2. 가격대 ─────────
+// 1인 기준 대략적인 가격대예요. 1 = 1만원 이하, 2 = 1~2만원, 3 = 2만원 이상
+const PRICE = {
+  // 1만원 이하
+  "김밥": 1, "순대": 1, "튀김": 1, "만두": 1, "쫄면": 1, "라볶이": 1, "토스트": 1, "떡볶이": 1,
+  "라면": 1, "핫도그": 1, "베이글": 1, "죽": 1, "수제비": 1, "짜장면": 1, "볶음밥": 1,
+  "우동": 1, "규동": 1, "샌드위치": 1, "반미": 1, "케밥": 1,
+  // 1~2만원
+  "김치찌개": 2, "된장찌개": 2, "순두부찌개": 2, "부대찌개": 2, "불고기": 2, "비빔밥": 2,
+  "제육볶음": 2, "갈비탕": 2, "설렁탕": 2, "감자탕": 2, "닭갈비": 2, "찜닭": 2, "냉면": 2,
+  "칼국수": 2, "삼계탕": 2, "육개장": 2, "미역국": 2, "생선구이": 2, "오징어볶음": 2,
+  "낙지볶음": 2, "해물파전": 2, "막국수": 2, "쌈밥": 2, "국밥": 2, "짬뽕": 2, "마라탕": 2,
+  "딤섬": 2, "라멘": 2, "돈카츠": 2, "소바": 2, "카레": 2, "오코노미야키": 2, "피자": 2,
+  "파스타": 2, "햄버거": 2, "리조또": 2, "샐러드": 2, "그라탕": 2, "쌀국수": 2, "팟타이": 2,
+  "인도 커리와 난": 2, "타코": 2, "부리토": 2, "닭발": 2, "포케": 2, "빙수": 2,
+  // 2만원 이상
+  "삼겹살": 3, "보쌈": 3, "족발": 3, "곱창": 3, "닭한마리": 3, "탕수육": 3, "깐풍기": 3,
+  "마라샹궈": 3, "초밥": 3, "회": 3, "스테이크": 3, "훠궈": 3, "후라이드치킨": 3,
+  "양념치킨": 3, "해물탕": 3, "조개구이": 3, "매운탕": 3,
+};
+menus.forEach((mn) => { mn.price = PRICE[splitName(mn.name).title]; });
+
+const PRICE_TEXT = { 1: "💸 1만원 이하", 2: "💵 1~2만원", 3: "💎 2만원 이상" };
+let currentPrice = 0; // 0 = 상관없음
+const priceOk = (mn) => currentPrice === 0 || mn.price === currentPrice;
+const priceLabel = (mn) => `${PRICE_TEXT[mn.price]} (1인 기준)`;
+
 // ───────── 2. 비슷한 말 사전 ─────────
 // 사용자가 쓴 단어(왼쪽) → 메뉴 태그(오른쪽)
 // 한 글자짜리 단어(면, 밥, 술...)는 "면접", "회사" 같은 엉뚱한 단어에 걸리지 않도록
@@ -232,7 +259,7 @@ function recommend(text, skip) {
   const { wanted, avoid } = analyze(text);
   const scored = menus
     .map((menu) => ({ menu, s: score(menu, text, wanted, avoid) }))
-    .filter((x) => x.s >= 0 && !skip.has(x.menu));
+    .filter((x) => x.s >= 0 && !skip.has(x.menu) && priceOk(x.menu));
 
   const matched = scored.filter((x) => x.s > 0);
   let pick, intro;
@@ -247,8 +274,8 @@ function recommend(text, skip) {
   } else {
     // 후보가 다 떨어졌으면 싫어요 목록을 비우고 처음부터
     skip.clear();
-    const all = menus.filter((mn) => score(mn, text, wanted, avoid) >= 0);
-    pick = pickRandom(all.length ? all : menus);
+    const all = menus.filter((mn) => priceOk(mn) && score(mn, text, wanted, avoid) >= 0);
+    pick = pickRandom(all.length ? all : menus.filter(priceOk));
     intro = "🔁 다 보셨네요! 처음부터 다시 골라 봤어요.";
   }
 
@@ -295,7 +322,8 @@ function render(data) {
     el("p", "intro", intro),
     el("div", "emoji", emoji),
     el("h2", "menu-title", title),
-    el("p", "menu-desc", pick.desc)
+    el("p", "menu-desc", pick.desc),
+    el("p", "price-tag", priceLabel(pick))
   );
 
   const actions = el("div", "actions");
@@ -318,6 +346,7 @@ function render(data) {
       chip.type = "button";
       chip.addEventListener("click", () => {
         skip.add(pick);
+        playDone();
         render({ pick: mn, intro: "👆 직접 고르셨어요!", extras: [], surprise: null });
       });
       chips.append(chip);
@@ -362,6 +391,7 @@ function showRecommendation() {
   const data = recommend(text, skip);
   skip.add(data.pick); // 같은 메뉴가 연속으로 나오지 않게
   spinThen(() => {
+    playDone();
     render(data);
     btn.textContent = "다시 추천받기";
   });
@@ -385,6 +415,7 @@ function spinThen(done) {
   let n = 0;
   const timer = setInterval(() => {
     face.textContent = splitName(pickRandom(menus).name).emoji;
+    playTick(n);
     if (++n >= 9) {
       clearInterval(timer);
       spinning = false;
@@ -409,5 +440,72 @@ document.querySelectorAll(".example").forEach((b) => {
   b.addEventListener("click", () => {
     input.value = b.dataset.text;
     showRecommendation();
+  });
+});
+
+// ───────── 7. 소리 (파일 없이 브라우저가 직접 만들어요) ─────────
+const soundBtn = document.getElementById("soundBtn");
+const sound = { ctx: null, on: true };
+try { sound.on = localStorage.getItem("sound") !== "off"; } catch (e) { /* 저장 못 해도 괜찮아요 */ }
+
+function audio() {
+  if (!sound.on) return null;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!sound.ctx) sound.ctx = new AC(); // 사용자가 버튼을 누른 뒤에만 만들어져요
+  if (sound.ctx.state === "suspended") sound.ctx.resume();
+  return sound.ctx;
+}
+
+// 음 하나 내기: 높이(Hz), 시작 시간(초), 길이(초), 파형, 볼륨
+function beep(freq, start, dur, type, vol) {
+  const c = audio();
+  if (!c) return;
+  const t = c.currentTime + start;
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(gain);
+  gain.connect(c.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.02);
+}
+
+function playTick(n) { beep(420 + n * 55, 0, 0.06, "triangle", 0.12); }   // 룰렛: 틱틱 (점점 높아짐)
+function playDone() { [523, 659, 784, 1047].forEach((f, i) => beep(f, i * 0.09, 0.28, "triangle", 0.16)); } // 띠리링
+function playPop() { beep(720, 0, 0.09, "sine", 0.1); }                    // 옵션 선택: 톡
+
+function updateSoundBtn() {
+  soundBtn.textContent = sound.on ? "🔊" : "🔇";
+  soundBtn.setAttribute("aria-pressed", String(sound.on));
+  soundBtn.title = sound.on ? "소리 끄기" : "소리 켜기";
+}
+soundBtn.addEventListener("click", () => {
+  sound.on = !sound.on;
+  try { localStorage.setItem("sound", sound.on ? "on" : "off"); } catch (e) { /* 무시 */ }
+  updateSoundBtn();
+  playPop();
+});
+updateSoundBtn();
+
+// 버튼류를 누르면 톡 소리 (추천 버튼은 룰렛 소리가 따로 있어서 제외)
+document.querySelectorAll(".example").forEach((b) => b.addEventListener("click", playPop));
+
+// ───────── 8. 가격대 옵션 ─────────
+const priceBtns = document.querySelectorAll(".price-opt");
+priceBtns.forEach((b) => {
+  b.addEventListener("click", () => {
+    currentPrice = Number(b.dataset.price);
+    priceBtns.forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+    playPop();
+    // 이미 추천을 한 번 받았다면, 바뀐 가격대로 바로 다시 추천
+    if (lastText && input.value.trim()) {
+      skip.clear();
+      showRecommendation();
+    }
   });
 });

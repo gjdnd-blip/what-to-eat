@@ -137,6 +137,56 @@ textarea:focus {
 .example:nth-child(5) { background: #8fd3ff; }
 .example:hover { transform: translateY(-3px) rotate(-2deg); }
 
+/* ───── 가격대 옵션 ───── */
+.price { margin-top: 18px; }
+.price-label { margin: 0 0 8px; font-size: 17px; }
+.price-label small { font-size: 13px; color: var(--muted); }
+.price-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.price-opt {
+  flex: 1 1 auto;
+  padding: 9px 12px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--ink);
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.12s;
+}
+.price-opt:hover { transform: translateY(-2px); background: var(--cream); }
+/* 선택된 옵션: 진한 배경 + 밝은 글자 */
+.price-opt[aria-checked="true"] {
+  color: var(--cream);
+  background: var(--ink);
+  box-shadow: 3px 3px 0 var(--tomato);
+}
+.price-tag {
+  display: inline-block;
+  margin: 12px 0 0;
+  padding: 4px 12px;
+  font-size: 15px;
+  background: var(--mustard);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+}
+
+/* ───── 소리 버튼 ───── */
+.sound-btn {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 46px; height: 46px;
+  font-size: 22px;
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+  border-radius: 50%;
+  box-shadow: 3px 3px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.sound-btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
+.sound-btn[aria-pressed="false"] { background: #eadfc8; }
+
 /* ───── 메인 버튼 (꾹 눌리는 느낌) ───── */
 #btn {
   display: block;
