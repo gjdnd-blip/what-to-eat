@@ -358,10 +358,40 @@ function showRecommendation() {
     skip.clear(); // 새 문장이면 목록 초기화
     lastText = text;
   }
+  if (spinning) return; // 룰렛이 도는 중에는 또 누를 수 없게
   const data = recommend(text, skip);
   skip.add(data.pick); // 같은 메뉴가 연속으로 나오지 않게
-  render(data);
-  btn.textContent = "다시 추천받기";
+  spinThen(() => {
+    render(data);
+    btn.textContent = "다시 추천받기";
+  });
+}
+
+// 룰렛 연출: 이모지가 빠르게 바뀌다가 결과가 나와요
+let spinning = false;
+function spinThen(done) {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) { done(); return; } // 움직임을 줄이고 싶은 사용자는 바로 결과
+
+  spinning = true;
+  btn.disabled = true;
+  result.replaceChildren();
+  const box = el("div", "spinner");
+  const face = el("div", "emoji spin-emoji", "🍽️");
+  box.append(face, el("p", "intro", "무엇을 먹을까 고르는 중..."));
+  result.append(box);
+  result.classList.remove("hidden", "show");
+
+  let n = 0;
+  const timer = setInterval(() => {
+    face.textContent = splitName(pickRandom(menus).name).emoji;
+    if (++n >= 9) {
+      clearInterval(timer);
+      spinning = false;
+      btn.disabled = false;
+      done();
+    }
+  }, 90);
 }
 
 btn.addEventListener("click", showRecommendation);

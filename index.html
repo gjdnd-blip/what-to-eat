@@ -9,12 +9,24 @@
   <meta property="og:title" content="오늘 뭐 먹지?">
   <meta property="og:description" content="지금 기분과 상황을 적으면 메뉴를 골라 드려요. 83가지 메뉴 중 랜덤 추천!">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%BD%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- 배경에 둥둥 떠다니는 음식들 (장식용) -->
+  <div class="floaters" aria-hidden="true">
+    <span>🍕</span><span>🍜</span><span>🍗</span><span>🍣</span>
+    <span>🥘</span><span>🍔</span><span>🥟</span><span>🍛</span>
+  </div>
+
   <main class="card">
-    <h1>🍽️ 오늘 뭐 먹지?</h1>
-    <p class="sub">지금 기분이나 상황을 자유롭게 적어 보세요.</p>
+    <header class="hero">
+      <div class="hero-emoji" aria-hidden="true">🍽️</div>
+      <h1>오늘 <span class="mark">뭐 먹지?</span></h1>
+      <p class="sub">지금 기분이나 상황을 적으면<br>메뉴를 콕 집어 드려요</p>
+    </header>
 
     <label for="input" class="sr-only">먹고 싶은 음식이나 상황</label>
     <textarea id="input" rows="3" spellcheck="false"
